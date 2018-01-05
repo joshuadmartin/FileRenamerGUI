@@ -7,17 +7,12 @@ Description: Change files names.
 
 TO-DO:
 -Add more Error feedback
--Add the ability to pre-pend numbers
 -Convert tagConfig.txt to tagConfig.json
+-Create and output a change log
 -Add the ability to rename the parent folder
 -Add the ability for text substitution
 -Add the ability to remove characters or words
--Append dates
--Create and output a change log
-
-BUGS:
--Fix white space remover/undo bug
--Fix add tag such that it doesn't reenable all tags previously used
+-Add the ability Append dates
 
 Created on Dec 26, 2017
 
@@ -26,6 +21,8 @@ Created on Dec 26, 2017
 import os
 from FileRenamer_c import FileRenamer_c
 import pyperclip 
+import math
+import atexit
 import tkinter as tk
 from tkinter import *
 from tkinter.filedialog import askdirectory
@@ -40,23 +37,28 @@ class ApplicationGUI_c:
         '''
         self.DEBUG = False
         
+        self.cFileRenamer = FileRenamer_c() 
+        
         self.TAG_FILE = os.path.join(os.getcwd(), "TagConfig.txt")
         self.TAG_SEPARATOR = "+"
         self.DISABLE_STATE = 'disabled'
         self.NORMAL_STATE = 'normal'
         self.START_STATE_STRING = "1"
-        self.NUMBER_FILE_EXAMPLE = '<FileName>_001'
-        self.TV_FORMAT_EXAMPLE = '<FileName>_S01E01'
-        self.TAG_EXAMPLE = '<FileName>'
+        self.NUMBER_FILE_EXAMPLE = '<File Name>'+ self.cFileRenamer.SPACE_REPLACEMENT +'001'
+        self.TV_FORMAT_EXAMPLE = '<File Name>' + self.cFileRenamer.SPACE_REPLACEMENT + 'S01E01'
+        self.TAG_EXAMPLE = '<File Name>'
+        self.REMOVE_SPACES = '<File' + self.cFileRenamer.SPACE_REPLACEMENT + 'Name>'
+        self.DEFUALT_RADIO = 3
+        self.TAG_COLUMN = 6
         self.PADX = 2
         self.PADY = 2
-        
-        self.cFileRenamer = FileRenamer_c() 
         
         self.mPath = ''
         self.mExample = ''
         self.mTagString =''
         self.mAddToTags = False
+        self.nextRow = 0
+        self.nextCol = 0
         
         master.title('File Renamer Tool')
         master.resizable(0,0)
@@ -96,8 +98,8 @@ class ApplicationGUI_c:
         #create mLeftCenterFrame buttons
         #create radio buttons
         self.vAction = tk.IntVar()
-        self.vAction.set(2)  # initializing the choice, i.e. Python
-        actions = ["Number Files","Format TV","Tag"]
+        self.vAction.set(self.DEFUALT_RADIO)  # initializing the choice, i.e. Python
+        actions = ["Number Files","Format TV","Tag", "Remove Spaces"]
         self.mActionRadioButtons = {}
         for val, action in enumerate(actions):
             radioButton = Radiobutton(self.mLeftCenterFrame,
@@ -131,9 +133,8 @@ class ApplicationGUI_c:
         self.mExampleLabel = Label(self.mOutputFrame, state=DISABLED, justify=LEFT, relief=SUNKEN)
         self.mCommitButton = Button(self.mOutputFrame, text='Commit', state=DISABLED, command=self.commit)
         self.mClearTagButton = Button(self.mOutputFrame, text='Clear Tags', state=DISABLED, command=self.clearOutputLabel)
-        self.mRemoveSpaces = IntVar()
-        self.mRemoveSpacesCheckBox = Checkbutton(self.mOutputFrame, text="Remove Spaces", state=DISABLED, variable=self.mRemoveSpaces)
         self.mOpenLocation = IntVar()
+        self.mOpenLocation.set(1)
         self.mOpenLocationCheckBox = Checkbutton(self.mOutputFrame, text="Open after Commit", state=DISABLED, variable=self.mOpenLocation)
         self.mQuitButton = Button(self.mOutputFrame, text='Quit', command=master.quit)
         
@@ -180,10 +181,11 @@ class ApplicationGUI_c:
         self.mExampleLabel.grid(row=0, column=1, columnspan=3, sticky="WE", padx=self.PADX, pady=self.PADY)
         self.mCommitButton.grid(row=0, column=4, sticky="WE", padx=self.PADX, pady=self.PADY)
         
-        self.mRemoveSpacesCheckBox.grid(row=1, column=1, sticky="W", padx=self.PADX, pady=self.PADY,)
         self.mOpenLocationCheckBox.grid(row=1, column=2, sticky="W", padx=self.PADX, pady=self.PADY,)
         self.mClearTagButton.grid(row=1, column=3, sticky="E", padx=self.PADX, pady=self.PADY)
         self.mQuitButton.grid(row=1, column=4, sticky="WE", padx=self.PADX, pady=self.PADY,)
+        
+        atexit.register(self.writeTagFile)
             
     def askFile(self):
         '''
@@ -243,10 +245,6 @@ class ApplicationGUI_c:
         if messagebox.askyesno('Verify', 'Are you sure you want to Commit?'):
             action = self.vAction.get()
             
-            if(self.mRemoveSpaces.get() == 1):
-                #remove spaces
-                self.cFileRenamer.removeWhiteSpace(self.mPath)
-            
             if(action == 0):
                 #number files
                 start = int(self.mStartEntry.get())
@@ -273,6 +271,9 @@ class ApplicationGUI_c:
                 if(self.mAddToTags):
                     self.cFileRenamer.appendFiles(self.mPath, self.mTagString)
                     self.mAddToTags = False
+            if(action == 3):
+                #remove spaces
+                self.cFileRenamer.removeWhiteSpace(self.mPath)
                     
             if(self.mOpenLocation.get() == 1):
                 #open location after commit
@@ -317,6 +318,13 @@ class ApplicationGUI_c:
             self.setStateTag(self.NORMAL_STATE)
             self.setStateTagButtons(self.NORMAL_STATE)
             self.setOutputLabel(self.TAG_EXAMPLE)
+        if(action == 3):
+            self.setStateNumberFiles(self.DISABLE_STATE)
+            self.setStateFormatTV(self.DISABLE_STATE)
+            self.setStateTag(self.DISABLE_STATE)
+            self.setStateTagButtons(self.DISABLE_STATE)
+            self.clearTagString()
+            self.setOutputLabel(self.REMOVE_SPACES)
     
     def clearInput(self):
         '''
@@ -388,7 +396,7 @@ class ApplicationGUI_c:
         if(self.DEBUG): print("setStateRadioButtons")
         for key, button in self.mActionRadioButtons.items():
             button['state'] = state
-        self.vAction.set(2)
+        self.vAction.set(self.DEFUALT_RADIO)
         self.setStateNumberFiles(state)
         if(state==self.DISABLE_STATE):
             self.setStateFormatTV(state)
@@ -423,7 +431,6 @@ class ApplicationGUI_c:
         self.mCommitButton['state'] = state
 #         self.mClearTagButton['state'] = state
         self.setStateTagButtons(state)
-        self.mRemoveSpacesCheckBox['state'] = state
         self.mOpenLocationCheckBox['state'] = state     
 
     def clearTagString(self):
@@ -434,7 +441,10 @@ class ApplicationGUI_c:
         self.mAddToTags = False
         self.mTagString = ''
         self.mClearTagButton['state'] = self.DISABLE_STATE
-        self.loadTagButtons(self.NORMAL_STATE)
+        if(self.vAction.get() == 2):
+            self.loadTagButtons(self.NORMAL_STATE)
+        else:
+            self.loadTagButtons(self.DISABLE_STATE)
         self.drawTagButtons()
            
     def setOutputLabel(self, string):
@@ -449,7 +459,7 @@ class ApplicationGUI_c:
         '''
         Append a string to the output label
         '''
-        if(self.DEBUG): print("addToOutputLabel")
+        if(self.DEBUG): print("addToOutputLabel: " + stringToAdd)
         newExample = self.mExample + stringToAdd
         self.setOutputLabel(newExample)
 
@@ -480,7 +490,8 @@ class ApplicationGUI_c:
         '''
         Load tag Buttons
         '''
-        if(self.DEBUG): print('loadTagButtons')
+        if(self.DEBUG): print('loadTagButtons: ' + state)
+        self.destroyTagButtons()
         self.mTagButtons.clear()
         for i, tag in enumerate(self.mTags):
             tagButton = Button(self.mTagButtonFrame, 
@@ -500,9 +511,28 @@ class ApplicationGUI_c:
         for (tag, button) in self.mTagButtons:
             button.grid(row=rowCount, column=colCount, padx=self.PADX, pady=self.PADY, sticky="W")
             colCount +=1
-            if(colCount == 6):
+            if(colCount == self.TAG_COLUMN):
                 colCount = 0
-                rowCount +=1
+                rowCount +=1     
+        self.nextCol = colCount
+        self.nextRow = rowCount
+           
+    def addAppendTagButton(self, tag):
+        
+        tagButton = Button(self.mTagButtonFrame, 
+                               text=tag, 
+                               width=10,  
+                               command=self.callback(len(self.mTagButtons)),
+                               state=self.NORMAL_STATE)
+        
+        self.mTagButtons.append(tuple((tag, tagButton)))
+        tagButton.grid(row=self.nextRow, column=self.nextCol, padx=self.PADX, pady=self.PADY, sticky="W")
+        
+        if(self.nextCol >= (self.TAG_COLUMN-1)):
+            self.nextCol = 0
+            self.nextRow += 1
+        else:
+            self.nextCol +=1
                 
     def addTag(self):
         '''
@@ -510,7 +540,7 @@ class ApplicationGUI_c:
         '''
         if(self.DEBUG): print('Add Tag')
                 
-        add = False
+        add = True
         tempTag = self.mTagEntry.get()
         
         #iterate over list until the proper place is determined
@@ -522,23 +552,13 @@ class ApplicationGUI_c:
             for i in range(len(self.mTags)):
                 if(tempTag == self.mTags[i]):
                     #if the list contains the item
+                    add = False
                     break
-                if(tempTag < self.mTags[i]):
-                    if(i == 0):
-                        #if the tempTag is the new first item
-                        self.mTags.insert(0, tempTag)
-                    else:
-                        self.mTags.insert(i, tempTag)
-                    add = True
-                    break
-                if(i >= len(self.mTags)-1):
-                    #if tempTag goes at the end
-                    self.mTags.append(tempTag)
-                    add = True
+
             if(add):
-                self.loadTagButtons(self.NORMAL_STATE)
-                self.drawTagButtons()
-                self.writeTagFile()
+                self.mTags.append(tempTag)
+                self.addAppendTagButton(tempTag)
+                
         
     def removeTag(self):
         '''
@@ -553,17 +573,14 @@ class ApplicationGUI_c:
                     self.mTags.remove(tag)
                     self.mTagButtons.remove(tuple((tagKey, button)))
                     self.drawTagButtons()
-                    self.writeTagFile()
                     break
                 
-    def removeSpaces(self):
+    def destroyTagButtons(self):
         '''
-        Remove Spaces from the file name
+        Destroy all tag Buttons
         '''
-        if(self.DEBUG): print('Remove Spaces')
-        self.mRemoveSpaces = True
-        self.mExample = self.mExample.replace(' ', self.cFileRenamer.SPACE_REPLACEMENT)
-        self.mExampleLabel['text'] = self.mExample
+        for (tagKey, button) in self.mTagButtons:
+                    button.destroy()
             
     def readTagFile(self):
         '''
@@ -586,8 +603,9 @@ class ApplicationGUI_c:
         '''
         if(self.DEBUG): print("writeTagFile")
         f = open(self.TAG_FILE, 'w')
-        for (tagKey, button) in self.mTagButtons:
-            f.write(tagKey + '\n')
+        self.mTags.sort()
+        for tag in self.mTags:
+            f.write(tag + '\n')
         f.closed
 
         
