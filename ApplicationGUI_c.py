@@ -6,8 +6,6 @@ Purpose: To provide a GUI for manipulating file names
 Description: Change files names.
 
 TO-DO:
--Add more Error feedback
--Convert tagConfig.txt to tagConfig.json
 -Create and output a change log
 -Add the ability to rename the parent folder
 -Add the ability Append dates
@@ -21,6 +19,7 @@ from FileRenamer_c import FileRenamer_c
 import pyperclip 
 import math
 import atexit
+import json
 import tkinter as tk
 from tkinter import *
 from tkinter.filedialog import askdirectory
@@ -54,13 +53,11 @@ class ApplicationGUI_c:
         self.TV_FORMAT_EXAMPLE = '<File Name>_S01E01'
         self.TAG_EXAMPLE = '<File Name>'
         self.REMOVE_SPACES = '<File' + self.spaceReplacement + 'Name>'
-        self.DEFUALT_SPACE = "_"
+        self.DEFUALT_SPACE = " "
         self.DEFUALT_RADIO = 0
         self.TAG_COLUMN = 6
         self.PADX = 2
         self.PADY = 2
-        
-
         
         master.title('File Renamer Tool')
         master.resizable(0,0)
@@ -90,7 +87,6 @@ class ApplicationGUI_c:
         self.mFileOpenButton = Button(self.mInputButtonFrame, text='File Open', command=self.askFile)
         self.mFolderOpenButton = Button(self.mInputButtonFrame, text='Folder Open', command=self.askDirectory)
         self.mInputOpenButton = Button(self.mInputButtonFrame, text='Paste', command=self.useInputEntry)
-        self.mErrorLabel = Label(self.mInputButtonFrame)
         
         #create mInputFrame buttons
         self.mInputLabel = Label(self.mInputFrame, text="Input:")
@@ -152,7 +148,6 @@ class ApplicationGUI_c:
         self.mFileOpenButton.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
         self.mFolderOpenButton.grid(row=0, column=1, padx=self.PADX, pady=self.PADY)
         self.mInputOpenButton.grid(row=0, column=2, padx=self.PADX, pady=self.PADY)
-        self.mErrorLabel.grid(row=0, column=3, padx=self.PADX, pady=self.PADY)
         
         # layout for mInputFrame
         self.mInputLabel.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
@@ -235,7 +230,7 @@ class ApplicationGUI_c:
             if(self.DEBUG): print("useInputEntry")
         else:
             error = "No such file " + "..\\" + os.path.basename(self.mPath)
-            self.setErrorLabel(error)
+            messagebox.showerror("Error", "Input: " + error)
             self.clearInput()
             self.clearOutputLabel()
             self.setStateOutputframe(self.DISABLE_STATE)
@@ -251,7 +246,6 @@ class ApplicationGUI_c:
         self.setStateOutputframe(self.NORMAL_STATE)
         self.showChoice()
         self.clearTagString()
-        self.clearErrorLabel()
              
     def commit(self):
         '''
@@ -311,7 +305,7 @@ class ApplicationGUI_c:
                 if(messagebox.askyesno('Verify', 'Would you like to undo?')):
                     self.cFileRenamer.undoFileChanges()
             else:
-                self.setErrorLabel("No files changed")
+                messagebox.showerror("Error", "Input: No files were changed.")
             
             self.cFileRenamer.clearUndoDict()
             self.clearInput()
@@ -382,18 +376,6 @@ class ApplicationGUI_c:
         self.mClearButton['state'] = self.DISABLE_STATE
         self.setStateRadioButtons(self.DISABLE_STATE)
         self.setStateOutputframe(self.DISABLE_STATE)
-        
-    def clearErrorLabel(self):
-        '''
-        clear the error label
-        '''
-        self.mErrorLabel['text'] = ''
-        
-    def setErrorLabel(self, error):
-        '''
-        set the error label
-        '''
-        self.mErrorLabel['text'] = "Error: " + error
             
     def setStateClearButton(self, state):
         '''
@@ -494,6 +476,8 @@ class ApplicationGUI_c:
         Set the state of the tag line buttons
         '''
         if(self.DEBUG): print("setStateTag", state)
+        if(state==self.DISABLE_STATE):
+            self.mTagEntry.delete(0, END)
         self.mTagEntry['state'] = state
         self.mAddTagButton['state'] = state
         self.mRemoveTagButton['state'] = state
@@ -515,7 +499,6 @@ class ApplicationGUI_c:
             self.mExampleLabel['text'] = ''
         self.mExampleLabel['state'] = state
         self.mCommitButton['state'] = state
-#         self.mClearTagButton['state'] = state
         self.setStateTagButtons(state)
         self.mOpenLocationCheckBox['state'] = state     
 
@@ -647,55 +630,56 @@ class ApplicationGUI_c:
             if(add):
                 self.mTags.append(tempTag)
                 self.addAppendTagButton(tempTag)
-                
+                self.mTagEntry.delete(0, END)
+                return True
+            
+        messagebox.showerror("Error", "Tag: " + tempTag + " already exist!")
+        return False      
         
     def removeTag(self):
         '''
         Remove a tag button
         '''
         if(self.DEBUG): print('Remove tag')
-        tag = self.mTagEntry.get()
-        if(tag != ""):
+        tempTag = self.mTagEntry.get()
+        if(tempTag != ""):
             for (tagKey, button) in self.mTagButtons:
-                if(tagKey == tag):
+                if(tagKey == tempTag):
                     button.destroy()
-                    self.mTags.remove(tag)
+                    self.mTags.remove(tempTag)
                     self.mTagButtons.remove(tuple((tagKey, button)))
                     self.drawTagButtons()
-                    break
+                    self.mTagEntry.delete(0, END)
+                    return True
                 
+        messagebox.showerror("Error", "Tag: " + tempTag + " does not exist!")
+        return False  
+           
     def destroyTagButtons(self):
         '''
         Destroy all tag Buttons
         '''
         for (tagKey, button) in self.mTagButtons:
-                    button.destroy()
-            
+                    button.destroy()            
+    
     def readTagFile(self):
         '''
         Read in the tag file
         '''
         if(self.DEBUG): print("readTagFile")
         tags = []
-        if(os.path.exists(self.TAG_FILE)):
-            with open(self.TAG_FILE) as f:
-                for line in f:
-                    line = line.rstrip('\n')
-                    tags.append(line)
-            f.closed
-            tags.sort()
+        with open(self.TAG_FILE) as tagFile:
+            tags = json.load(tagFile)
         return tags
-    
+        
     def writeTagFile(self):
         '''
         Write the tags to file
         '''
         if(self.DEBUG): print("writeTagFile")
-        f = open(self.TAG_FILE, 'w')
         self.mTags.sort()
-        for tag in self.mTags:
-            f.write(tag + '\n')
-        f.closed
+        with open(self.TAG_FILE, 'w') as tagFile:
+            json.dump(self.mTags, tagFile)
 
         
 root = Tk()

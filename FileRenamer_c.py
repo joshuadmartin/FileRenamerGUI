@@ -15,6 +15,7 @@ class FileRenamer_c(object):
         '''
         Constructor
         '''
+        self.DEBUG = False
         self.badCharacters = ['*','\\','/',':','<','>','?','|','"']
         self.undoDict = {}
         
@@ -22,6 +23,7 @@ class FileRenamer_c(object):
         '''
         Append a string to the end of a file name
         '''    
+        if(self.DEBUG): print('appendFiles:', path, stringToAppend)
         success = False
         #if the directory given is valid then change it to that directory
         if os.path.isdir(path):
@@ -43,6 +45,7 @@ class FileRenamer_c(object):
         '''
         Number files in sequencial order
         '''
+        if(self.DEBUG): print('numberFiles:', path, title, countStart)
         success = False
         
         count = countStart
@@ -70,6 +73,7 @@ class FileRenamer_c(object):
         '''
         Number files in sequential TV order
         '''
+        if(self.DEBUG): print('formatTV:', path, title, season, episode)
         season = int(season)
         episode = int(episode)
         tvFormat = ("_S%02dE%02d" %(season, episode))
@@ -100,6 +104,7 @@ class FileRenamer_c(object):
         '''
         Append a counter to the end of a file name
         '''
+        if(self.DEBUG): print('numberAFile:', path, title, count)
         fileName, fileExt = os.path.splitext(path)
         newFileName = title + str(count)
         if(fileName != newFileName):
@@ -110,6 +115,7 @@ class FileRenamer_c(object):
         '''
         Remove white space and replace
         '''
+        if(self.DEBUG): print('removeAndReplace:', path, replace, replaceWith)
         success = False
         #if the directory given is valid then change it to that directory
         if os.path.isdir(path):
@@ -130,6 +136,7 @@ class FileRenamer_c(object):
         '''
         Remove white space from file
         '''
+        if(self.DEBUG): print('removeAndReplaceFromFile:', path, replace, replaceWith)
         if replace in self.badCharacters:
             return False
         if replaceWith in self.badCharacters:
@@ -145,6 +152,7 @@ class FileRenamer_c(object):
         '''
         Move a file to a new file name
         '''
+        if(self.DEBUG): print('moveFile:', fileName, newFileName, fileExt)
         #get the full path names
         absWorkingDir = os.path.abspath('.')
         fileName = os.path.join(absWorkingDir, (fileName + fileExt))
@@ -179,6 +187,7 @@ class FileRenamer_c(object):
         '''
         Print out the files in the undo dictionary
         '''
+        if(self.DEBUG): print('printUndoDict:')
         for fileName, newFileName in self.undoDict.items():
             print("file: " + fileName)
             print("new: " + newFileName)
@@ -187,6 +196,7 @@ class FileRenamer_c(object):
         '''
         Undo the file changes previous done
         '''
+        if(self.DEBUG): print('undoFileChanges:')
         for fileName, newFileName in self.undoDict.items():
 #             print("Moving: " + newFileName + " to " + fileName)
             shutil.move(newFileName, fileName)
@@ -196,6 +206,7 @@ class FileRenamer_c(object):
         '''
         Clear out the undo dictionary
         '''
+        if(self.DEBUG): print('clearUndoDict:')
         self.undoDict.clear()
         
         
