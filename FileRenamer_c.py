@@ -15,31 +15,36 @@ class FileRenamer_c(object):
         '''
         Constructor
         '''
-        self.SPACE_REPLACEMENT = "_"
+        self.badCharacters = ['*','\\','/',':','<','>','?','|','"']
         self.undoDict = {}
         
     def appendFiles(self, path, stringToAppend):
         '''
         Append a string to the end of a file name
-        '''      
+        '''    
+        success = False
         #if the directory given is valid then change it to that directory
         if os.path.isdir(path):
             os.chdir(path)
             for fileNamePath in os.listdir(os.getcwd()):
                 fileName, fileExt = os.path.splitext(fileNamePath)
                 newFileName = fileName + stringToAppend
-                self.moveFile(fileName, newFileName, fileExt)
+                result = self.moveFile(fileName, newFileName, fileExt)
+                success = result or success
+            return success
 
         else:
             fileName, fileExt = os.path.splitext(path)
             newFileName = fileName + stringToAppend
-            self.moveFile(fileName, newFileName, fileExt)
-        
+            return self.moveFile(fileName, newFileName, fileExt)
+        return False
         
     def numberFiles(self, path, title, countStart):
         '''
         Number files in sequencial order
         '''
+        success = False
+        
         count = countStart
         #if the directory given is valid then change it to that directory
         if os.path.isdir(path):
@@ -47,14 +52,19 @@ class FileRenamer_c(object):
             #Loop over the files in the working directory
             for fileName in os.listdir(os.getcwd()):
                 if(os.path.isfile(fileName)):
-                    countStr = ("%03d" %count)
-                    self.numberAFile(fileName, title, countStr)
+                    countStr = ("_%03d" %count)
+                    result = self.numberAFile(fileName, title, countStr)
                     count += 1
+                    success = result or success
+                    
+            return success
         else:
             parent = os.path.abspath(os.path.join(path, os.pardir))
             os.chdir(parent)
             fileName = os.path.basename(path)
-            self.numberAFile(fileName, title, count)
+            return self.numberAFile(fileName, title, count)
+            
+        return False
                                 
     def formatTV(self, path, title, season, episode):
         '''
@@ -62,7 +72,9 @@ class FileRenamer_c(object):
         '''
         season = int(season)
         episode = int(episode)
-        tvFormat = ("S%02dE%02d" %(season, episode))
+        tvFormat = ("_S%02dE%02d" %(season, episode))
+        
+        success = False
 
         #if the directory given is valid then change it to that directory
         if os.path.isdir(path):
@@ -70,49 +82,63 @@ class FileRenamer_c(object):
             #Loop over the files in the working directory
             for fileName in os.listdir(os.getcwd()):
                 if(os.path.isfile(fileName)):
-                    self.numberAFile(fileName, title, tvFormat)
+                    result = self.numberAFile(fileName, title, tvFormat)
                     episode += 1
-                    tvFormat = ("S%02dE%02d" %(season, episode))
+                    tvFormat = ("_S%02dE%02d" %(season, episode))
+                    success = result or result
+            return success
 
         else:
             parent = os.path.abspath(os.path.join(path, os.pardir))
             os.chdir(parent)
             fileName = os.path.basename(path)
-            self.numberAFile(fileName, title, tvFormat)
+            return self.numberAFile(fileName, title, tvFormat)
+        
+        return False
           
     def numberAFile(self, path, title, count):
         '''
         Append a counter to the end of a file name
         '''
         fileName, fileExt = os.path.splitext(path)
-        newFileName = title + self.SPACE_REPLACEMENT + str(count)
+        newFileName = title + str(count)
         if(fileName != newFileName):
-            self.moveFile(fileName, newFileName, fileExt)   
+            return self.moveFile(fileName, newFileName, fileExt)   
+        return False
             
-    def removeWhiteSpace(self, path):
+    def removeAndReplace(self, path, replace, replaceWith):
         '''
-        Remove white space from a path
+        Remove white space and replace
         '''
+        success = False
         #if the directory given is valid then change it to that directory
         if os.path.isdir(path):
             os.chdir(path)
     
             #Loop over the files in the working directory
             for fileName in os.listdir(os.getcwd()):
-                self.removeWhiteSpaceFromFile(fileName)
-    
+                result = self.removeAndReplaceFromFile(fileName, replace, replaceWith)
+                success = result or success
+            return success
         else:
             fileName = os.path.basename(path)
-            self.removeWhiteSpaceFromFile(fileName)
+            return self.removeAndReplaceFromFile(fileName, replace, replaceWith)
+            
+        return False
                 
-    def removeWhiteSpaceFromFile(self, path):
+    def removeAndReplaceFromFile(self, path, replace, replaceWith):
         '''
         Remove white space from file
         '''
+        if replace in self.badCharacters:
+            return False
+        if replaceWith in self.badCharacters:
+            return False
         fileName, fileExt = os.path.splitext(path)
-        newFileName = fileName.replace(' ', self.SPACE_REPLACEMENT)
+        newFileName = fileName.replace(replace, replaceWith)
         if(fileName != newFileName):
-            self.moveFile(fileName, newFileName, fileExt)
+            return self.moveFile(fileName, newFileName, fileExt)
+        return False
         
     
     def moveFile(self, fileName, newFileName, fileExt):   
@@ -138,10 +164,16 @@ class FileRenamer_c(object):
                     
 #         print("filename: " + fileName)
 #         print("newFileName: " + newFileName)
-
-        #rename the files
-        shutil.move(fileName, newFileName)
-        self.undoDict[fileName] = newFileName
+        
+        try:
+            #rename the files
+            shutil.move(fileName, newFileName)
+            self.undoDict[fileName] = newFileName
+            return True
+        except:
+            return False
+        
+        return False
         
     def printUndoDict(self):
         '''
